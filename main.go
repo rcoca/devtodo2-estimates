@@ -74,6 +74,9 @@ var allFlag = kingpin.Flag("all", "Show all tasks, even completed ones.").Short(
 var summaryFlag = kingpin.Flag("summary", "Summarise tasks to one line.").Short('s').Bool()
 var orderFlag = kingpin.Flag("order", "Specify display order of tasks ([-]index,created,completed,text,priority,duration,done)").Default("priority").Enum(orderEnum...)
 
+// Add estimate flag
+var estimateFlag = kingpin.Flag("estimate", "Estimate for the task (e.g., 2h, 1d, 2w, 1m, 1y)").String()
+
 // Task text.
 var taskText = kingpin.Arg("arg", "Task text or index.").Strings()
 
@@ -95,16 +98,34 @@ func doView(tasks TaskList) {
 }
 
 func doAdd(tasks TaskList, graft TaskNode, priority Priority, text string) {
-	graft.Create(text, priority)
+	var refTask = graft.Create(text, priority)
+	// Parse and set estimate if provided
+	if *estimateFlag != "" {
+		estimate, err := ParseEstimate(*estimateFlag)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Invalid estimate format: %v\n", err)
+		} else {
+			refTask.SetEstimate(estimate)
+		}
+	}
 	saveTaskList(tasks)
 }
 
-func doEditTask(tasks TaskList, task Task, priority Priority, text string) {
+func doEditTask(tasks TaskList, task Task, priority Priority, text string, estimate string) {
 	if text != "" {
 		task.SetText(text)
 	}
 	if priority != -1 {
 		task.SetPriority(priority)
+	}
+	// Handle estimate update
+	if estimate != "" {
+		estimateObj, err := ParseEstimate(estimate)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: Invalid estimate format: %v\n", err)
+		} else {
+			task.SetEstimate(estimateObj)
+		}
 	}
 	saveTaskList(tasks)
 }
@@ -161,6 +182,33 @@ func doShowInfo(tasks TaskList, index string) {
 	view.ShowTaskInfo(task)
 }
 
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+func cutLeaf(index string) string {
+	var path = strings.Split(index, ".")
+	return strings.Join(path[:len(path)-1], ".")
+}
+
+func updateParentsEstimates(tasks TaskList, index string, pop bool) {
+	var path = strings.Split(index, ".")
+	for {
+		//either skip the first tail trim (for edit) - or didn't (for add).
+		// either way, keep shifting for upcoming iterations
+		path = path[:len(path)-boolToInt(pop)]
+		pop = true
+		if len(path) == 0 {
+			break
+		}
+		var index = strings.Join(path, ".")
+		var parent = resolveTaskReference(tasks, index)
+		parent.SetEstimate(parent.SumDescendants())
+	}
+}
+
 func processAction(tasks TaskList) {
 	priority := PriorityFromString(*priorityFlag)
 	var graft TaskNode = tasks // -golint
@@ -177,12 +225,20 @@ func processAction(tasks TaskList) {
 		}
 		text := strings.Join(*taskText, " ")
 		doAdd(tasks, graft, priority, text)
+		updateParentsEstimates(tasks, *graftFlag, false)
+		doView(tasks)
 	case *markDoneFlag:
+		doView(tasks)
 		doMarkDone(tasks, resolveTaskReferences(tasks, *taskText))
+		doView(tasks)
 	case *markNotDoneFlag:
 		doMarkNotDone(tasks, resolveTaskReferences(tasks, *taskText))
 	case *removeFlag:
 		doRemove(tasks, resolveTaskReferences(tasks, *taskText))
+		for _, t := range *taskText {
+			updateParentsEstimates(tasks, t, true)
+		}
+		saveTaskList(tasks)
 	case *reparentFlag:
 		if len(*taskText) < 1 {
 			fatalf("expected <task> [<new-parent>] for reparenting")
@@ -194,6 +250,9 @@ func processAction(tasks TaskList) {
 			below = tasks
 		}
 		doReparent(tasks, resolveTaskReference(tasks, (*taskText)[0]), below)
+		updateParentsEstimates(tasks, cutLeaf((*taskText)[0]), false)
+		updateParentsEstimates(tasks, (*taskText)[1], false)
+		saveTaskList(tasks)
 	case *titleFlag:
 		doSetTitle(tasks, *taskText)
 	case *infoFlag:
@@ -218,7 +277,9 @@ func processAction(tasks TaskList) {
 		if *priorityFlag == "" {
 			priority = -1
 		}
-		doEditTask(tasks, task, priority, text)
+		doEditTask(tasks, task, priority, text, *estimateFlag)
+		updateParentsEstimates(tasks, (*taskText)[0], true)
+		doView(tasks)
 	case *purgeFlag != -1*time.Second:
 		doPurge(tasks, *purgeFlag)
 	default:
@@ -351,5 +412,6 @@ func main() {
 	if tasks == nil {
 		tasks = NewTaskList()
 	}
+	tasks.SetEstimate(tasks.SumDescendants())
 	processAction(tasks)
 }

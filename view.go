@@ -58,6 +58,7 @@ func (t *TaskView) Len() int {
 	return len(t.tasks)
 }
 
+// Add to TaskView Less method to handle estimates
 func (t *TaskView) Less(i, j int) bool {
 	left := t.tasks[i]
 	right := t.tasks[j]
@@ -90,8 +91,8 @@ func (t *TaskView) Less(i, j int) bool {
 		less = leftDuration < rightDuration
 	case DONE:
 		less = !left.CompletionTime().IsZero() && !right.CompletionTime().IsZero()
-	default:
-		panic("invalid ordering")
+	case ESTIMATE: // New case for sorting by estimates
+		less = left.Estimate() < right.Estimate()
 	}
 	if t.options.Reversed {
 		less = !less

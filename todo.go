@@ -17,11 +17,96 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
+
+// ParseEstimate parses a string like "2h", "1d", "2w", "1m", "1y" into a time.Duration
+func ParseEstimate(estimate string) (time.Duration, error) {
+	if estimate == "" {
+		return 0, nil
+	}
+
+	// Remove whitespace
+	estimate = strings.TrimSpace(estimate)
+
+	// Check if the string is valid
+	if len(estimate) < 2 {
+		return 0, fmt.Errorf("invalid estimate format: %s", estimate)
+	}
+
+	// Extract the numeric part and unit part
+	numStr := ""
+	unitStr := ""
+
+	// Find where the numeric part ends
+	for i, char := range estimate {
+		if !unicode.IsDigit(char) && char != '.' && char != '-' && char != '+' {
+			numStr = estimate[:i]
+			unitStr = estimate[i:]
+			break
+		}
+	}
+
+	// If no unit found
+	if unitStr == "" {
+		return 0, fmt.Errorf("invalid estimate format: %s", estimate)
+	}
+
+	// Parse the numeric part
+	num, err := strconv.ParseFloat(numStr, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid number in estimate: %s", estimate)
+	}
+
+	// Convert to duration based on unit
+	var duration time.Duration
+	switch strings.ToLower(unitStr) {
+	case "h", "hr", "hrs", "hour", "hours":
+		duration = time.Duration(num * float64(time.Hour))
+	case "m", "min", "mins", "minutes":
+		duration = time.Duration(num * float64(time.Hour/60))
+	case "d", "day", "days":
+		duration = time.Duration(num * float64(24*time.Hour))
+	case "w", "wk", "wks", "week", "weeks":
+		duration = time.Duration(num * float64(7*24*time.Hour))
+	case "mon", "mons", "month", "months":
+		duration = time.Duration(num * float64(30*24*time.Hour))
+	case "y", "yr", "yrs", "year", "years":
+		duration = time.Duration(num * float64(365*24*time.Hour))
+	default:
+		return 0, fmt.Errorf("unknown time unit in estimate: %s", unitStr)
+	}
+
+	return duration, nil
+}
+
+// FormatEstimate formats a duration into a human-readable string
+func FormatEstimate(duration time.Duration) string {
+	if duration == 0 {
+		return ""
+	}
+
+	// Convert to appropriate unit
+	switch {
+	case duration >= 365*24*time.Hour:
+		return fmt.Sprintf("%.2fy", float64(duration.Hours()/(365.0*24)))
+	case duration >= 30*24*time.Hour:
+		return fmt.Sprintf("%.2fM", float64(duration.Hours()/(30.0*24)))
+	case duration >= 7*24*time.Hour:
+		return fmt.Sprintf("%.2fw", float64(duration.Hours()/(7.0*24)))
+	case duration >= 24*time.Hour:
+		return fmt.Sprintf("%.2fd", float64(duration.Hours()/(24.0)))
+	case duration >= time.Hour:
+		return fmt.Sprintf("%.2fh", duration.Hours())
+	default:
+		return fmt.Sprintf("%.2fm", float64(duration/time.Minute))
+	}
+}
 
 type Priority int
 
@@ -45,6 +130,7 @@ const (
 	DURATION
 	DONE
 	INDEX
+	ESTIMATE
 )
 
 type TaskListIO interface {
@@ -64,8 +150,29 @@ type TaskNode interface {
 	Append(child TaskNode)
 	Create(title string, priority Priority) Task
 	Delete()
+
+	// Estimate methods for TaskNode
+	SetEstimate(est time.Duration)
+	Estimate() time.Duration
+	SumDescendants() time.Duration
 }
 
+// Add Estimate method to taskNodeImpl
+func (t *taskNodeImpl) Estimate() time.Duration {
+	return t.estimate
+}
+func (t *taskNodeImpl) SetEstimate(est time.Duration) {
+	t.estimate = est
+}
+func (t *taskNodeImpl) SumDescendants() time.Duration {
+	var sum = time.Duration(0.0)
+	for i := 0; i < t.Len(); i++ {
+		sum += t.At(i).Estimate()
+	}
+	return sum
+}
+
+// Task interface additions
 type Task interface {
 	TaskNode
 
@@ -81,6 +188,10 @@ type Task interface {
 	SetCompleted()
 	SetCompletionTime(time time.Time)
 	CompletionTime() time.Time
+
+	// Estimate methods
+	Estimate() time.Duration
+	SetEstimate(estimate time.Duration)
 
 	// Extra attributes usable by extensions
 	Attributes() map[string]string
@@ -176,6 +287,7 @@ type taskNodeImpl struct {
 	id         int
 	tasks      []TaskNode
 	parent     TaskNode
+	estimate   time.Duration
 	attributes map[string]string
 }
 
@@ -245,6 +357,16 @@ type taskImpl struct {
 	text               string
 	priority           Priority
 	created, completed time.Time
+	estimate           time.Duration
+	attributes         map[string]string
+}
+
+func (t *taskImpl) Estimate() time.Duration {
+	return t.estimate
+}
+
+func (t *taskImpl) SetEstimate(estimate time.Duration) {
+	t.estimate = estimate
 }
 
 func newTask(id int, text string, priority Priority) Task {

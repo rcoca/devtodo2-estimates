@@ -57,6 +57,7 @@ type marshalableTask struct {
 	Priority   string             `json:"priority"`
 	Creation   int64              `json:"creation"`
 	Completion int64              `json:"completion,omitempty"`
+	Estimate   time.Duration      `json:"estimate,omitempty"`
 	Tasks      []*marshalableTask `json:"tasks,omitempty"`
 }
 
@@ -77,17 +78,22 @@ func toMarshalableTask(n TaskNode) []*marshalableTask {
 	for i := 0; i < n.Len(); i++ {
 		t := n.At(i)
 		var created, completed int64 = 0, 0
+		var estimated time.Duration = 0
 		if !t.CreationTime().IsZero() {
 			created = t.CreationTime().Unix()
 		}
 		if !t.CompletionTime().IsZero() {
 			completed = t.CompletionTime().Unix()
 		}
+		if t.Estimate().Hours() != 0 {
+			estimated = t.Estimate()
+		}
 		children[i] = &marshalableTask{
 			Text:       t.Text(),
 			Priority:   t.Priority().String(),
 			Creation:   created,
 			Completion: completed,
+			Estimate:   estimated,
 			Tasks:      toMarshalableTask(t),
 		}
 	}
@@ -107,6 +113,9 @@ func fromMarshalableTask(node TaskNode, t []*marshalableTask) {
 		task.SetCreationTime(time.Unix(j.Creation, 0).UTC())
 		if j.Completion != 0 {
 			task.SetCompletionTime(time.Unix(j.Completion, 0).UTC())
+		}
+		if j.Estimate.Minutes() != 0 {
+			task.SetEstimate(j.Estimate)
 		}
 		fromMarshalableTask(task, j.Tasks)
 	}

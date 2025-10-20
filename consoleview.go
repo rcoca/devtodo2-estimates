@@ -91,7 +91,7 @@ func fatalf(format string, args ...interface{}) {
 	os.Exit(1)
 }
 
-func printWrappedText(text string, width, subsequentIndent int) {
+func printWrappedText(text string, width, subsequentIndent int) int {
 	tokens := strings.Split(text, " ")
 	offset := 0
 	for i, token := range tokens {
@@ -106,6 +106,7 @@ func printWrappedText(text string, width, subsequentIndent int) {
 			offset++
 		}
 	}
+	return offset
 }
 
 func formatTask(width, depth int, task Task, options *ViewOptions) {
@@ -116,6 +117,9 @@ func formatTask(width, depth int, task Task, options *ViewOptions) {
 		task.ID()+1, RESET, colourPriorityMap[task.Priority()])
 	text := task.Text()
 	trimmed := false
+	if task.Estimate().Minutes() != 0 {
+		text += strings.Repeat(" ", max(0, width-20-len(text))) + " \t:" + FormatEstimate(task.Estimate())
+	}
 	if options.Summarise {
 		if len(text) > width {
 			text = strings.TrimSpace(text[:width-1])
@@ -155,7 +159,10 @@ func (c *ConsoleView) ShowTree(tasks TaskList, options *ViewOptions) {
 	width := getTerminalWidth()
 	if tasks.Title() != "" {
 		fmt.Print(TITLE_COLOUR)
-		printWrappedText("    "+tasks.Title(), width, 4)
+		var offset = printWrappedText("    "+tasks.Title(), width, 4)
+		if tasks.Estimate().Minutes() != 0 {
+			printWrappedText(strings.Repeat(" ", max(0, width-20-offset))+" \t:"+FormatEstimate(tasks.Estimate()), width, 0)
+		}
 		fmt.Printf("%s\n", RESET)
 	}
 	view := CreateTaskView(tasks, options)
@@ -175,5 +182,9 @@ func (c *ConsoleView) ShowTaskInfo(task Task) {
 	if !task.CompletionTime().IsZero() {
 		completed = task.CompletionTime().Local().String()
 	}
-	fmt.Printf("%sCompleted:%s %s\n", BRIGHT, RESET, completed)
+	fmt.Printf("%sCompleted:%s %s", BRIGHT, RESET, completed)
+	if task.Estimate().Minutes() != 0 {
+		fmt.Printf(" Estimate:%s", FormatEstimate(task.Estimate()))
+	}
+	fmt.Printf("\n")
 }
