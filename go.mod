@@ -1,4 +1,4 @@
-module github.com/alecthomas/devtodo2
+module github.com/rcoca/devtodo2-estimates
 
 go 1.22.1
 
