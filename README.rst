@@ -1,5 +1,5 @@
-DevTodo2
-========
+DevTodo2. With support for estimates
+=====================================
 DevTodo2 is a command-line task management utility. Tasks are hierarchically
 organised, have priorities, and track creation and completion time.
 
@@ -10,12 +10,12 @@ For much more complete information please refer to the man page (todo2(1)).
 Installing
 ----------
 DevTodo2 is written in `Go <http://golang.org>`_. To install, you will
-need Go 1 or a release candidate.
+need Go 1 or a release candidate. This fork in based on original work of `alecthomas <https://github.com/alecthomas/devtodo2>`_
 
 Once you have Go installed and your ``GOPATH`` set, do the following::
 
   $ go get github.com/alecthomas/kingpin/v2
-  $ git clone git://github.com/alecthomas/devtodo2.git
+  $ git clone https://github.com/rcoca/devtodo2-estimates.git
   $ cd devtodo2
   $ make
   $ [sudo] make install
@@ -28,7 +28,7 @@ and ``$(mandir)/man1``, respectively.
 
 **NOTE:** You can also install with::
 
-  $ go get github.com/alecthomas/devtodo2
+  $ go get github.com/rcoca/devtodo2-estimates
 
 But the binary will be named ``devtodo2`` and the man page will not be
 installed.
@@ -52,6 +52,9 @@ Add a new sub-task below subtask 1.1   ``todo2 -ag 1.1 Go to store``
 Remove a sub-task below subtask 1      ``todo2 --remove 1.1``
 List outstanding tasks                 ``todo2``
 List *all* tasks                       ``todo2 -A``
+Add estimate                           ``todo2 -a Shopping list --estimate=0.5h``
+Edit estimate                          ``todo2 -e 1.1 --estimate=1d``
+
 ====================================   ==============================
 
 DevTodo1?
@@ -68,6 +71,11 @@ New features:
 - Everything is a *lot* faster.
 - Much less code.
 
+    Estimates:
+    
+    - add, edit, and reparent estimates with recalculation
+    - removing task recomputes estimates
+
 Not currently supported:
 
 - Readline-based editing of task text and priority.
@@ -76,6 +84,11 @@ Not currently supported:
 - ``~/.todorc`` configuration file.
 - Colour customisation.
 - Custom task formatting.
+
+    Estimates:
+    
+    - marking task as done does not update the estimates tree
+    - purging will not recompute estimates tree
 
 How do I import my version 1 task lists?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
