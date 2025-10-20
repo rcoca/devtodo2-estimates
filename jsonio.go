@@ -108,6 +108,7 @@ func fromMarshalableTaskList(l *marshalableTaskList) TaskList {
 }
 
 func fromMarshalableTask(node TaskNode, t []*marshalableTask) {
+	var treeEst time.Duration = 0
 	for _, j := range t {
 		task := node.Create(j.Text, PriorityFromString(j.Priority))
 		task.SetCreationTime(time.Unix(j.Creation, 0).UTC())
@@ -116,7 +117,11 @@ func fromMarshalableTask(node TaskNode, t []*marshalableTask) {
 		}
 		if j.Estimate.Minutes() != 0 {
 			task.SetEstimate(j.Estimate)
+			treeEst += task.Estimate()
 		}
 		fromMarshalableTask(task, j.Tasks)
+	}
+	if len(t) > 0 && treeEst.Minutes() != 0 {
+		node.SetEstimate(treeEst)
 	}
 }
