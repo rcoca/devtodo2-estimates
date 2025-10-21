@@ -97,7 +97,7 @@ func doView(tasks TaskList) {
 	view.ShowTree(tasks, options)
 }
 
-func doAdd(tasks TaskList, graft TaskNode, priority Priority, text string) {
+func doAdd(tasks TaskList, graft TaskNode, priority Priority, text string) Task {
 	var refTask = graft.Create(text, priority)
 	// Parse and set estimate if provided
 	if *estimateFlag != "" {
@@ -109,6 +109,7 @@ func doAdd(tasks TaskList, graft TaskNode, priority Priority, text string) {
 		}
 	}
 	saveTaskList(tasks)
+	return refTask
 }
 
 func doEditTask(tasks TaskList, task Task, priority Priority, text string, estimate string) {
@@ -224,13 +225,13 @@ func processAction(tasks TaskList) {
 			fatalf("expected text for new task")
 		}
 		text := strings.Join(*taskText, " ")
-		doAdd(tasks, graft, priority, text)
+		var task = doAdd(tasks, graft, priority, text)
+		if *graftFlag == "root" {
+			*graftFlag = strconv.Itoa(task.ID())
+		}
 		updateParentsEstimates(tasks, *graftFlag, false)
-		doView(tasks)
 	case *markDoneFlag:
-		doView(tasks)
 		doMarkDone(tasks, resolveTaskReferences(tasks, *taskText))
-		doView(tasks)
 	case *markNotDoneFlag:
 		doMarkNotDone(tasks, resolveTaskReferences(tasks, *taskText))
 	case *removeFlag:
@@ -279,7 +280,6 @@ func processAction(tasks TaskList) {
 		}
 		doEditTask(tasks, task, priority, text, *estimateFlag)
 		updateParentsEstimates(tasks, (*taskText)[0], true)
-		doView(tasks)
 	case *purgeFlag != -1*time.Second:
 		doPurge(tasks, *purgeFlag)
 	default:
