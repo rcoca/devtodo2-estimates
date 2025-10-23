@@ -229,7 +229,9 @@ func processAction(tasks TaskList) {
 		if *graftFlag == "root" {
 			*graftFlag = strconv.Itoa(task.ID())
 		}
-		updateParentsEstimates(tasks, *graftFlag, false)
+		if tasks.Len() > 1 {
+			updateParentsEstimates(tasks, *graftFlag, false)
+		}
 	case *markDoneFlag:
 		doMarkDone(tasks, resolveTaskReferences(tasks, *taskText))
 	case *markNotDoneFlag:
@@ -412,6 +414,8 @@ func main() {
 	if tasks == nil {
 		tasks = NewTaskList()
 	}
+
 	tasks.SetEstimate(tasks.SumDescendants())
+
 	processAction(tasks)
 }
