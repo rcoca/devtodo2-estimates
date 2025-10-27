@@ -195,13 +195,19 @@ func cutLeaf(index string) string {
 }
 
 func updateParentsEstimates(tasks TaskList, index string, pop bool) {
+	if tasks.Len() <= 1 {
+		return
+	}
 	var path = strings.Split(index, ".")
+	if len(path) <= boolToInt(pop) {
+		return
+	}
 	for {
 		//either skip the first tail trim (for edit) - or didn't (for add).
 		// either way, keep shifting for upcoming iterations
 		path = path[:len(path)-boolToInt(pop)]
 		pop = true
-		if len(path) == 0 {
+		if len(path) == 0 || len(index) == 0 {
 			break
 		}
 		var index = strings.Join(path, ".")
@@ -229,9 +235,8 @@ func processAction(tasks TaskList) {
 		if *graftFlag == "root" {
 			*graftFlag = strconv.Itoa(task.ID())
 		}
-		if tasks.Len() > 1 {
-			updateParentsEstimates(tasks, *graftFlag, false)
-		}
+		updateParentsEstimates(tasks, *graftFlag, false)
+
 	case *markDoneFlag:
 		doMarkDone(tasks, resolveTaskReferences(tasks, *taskText))
 	case *markNotDoneFlag:
@@ -252,9 +257,13 @@ func processAction(tasks TaskList) {
 		} else {
 			below = tasks
 		}
+
 		doReparent(tasks, resolveTaskReference(tasks, (*taskText)[0]), below)
-		updateParentsEstimates(tasks, cutLeaf((*taskText)[0]), false)
-		updateParentsEstimates(tasks, (*taskText)[1], false)
+		if len((*taskText)) > 1 {
+			updateParentsEstimates(tasks, cutLeaf((*taskText)[0]), false)
+			updateParentsEstimates(tasks, (*taskText)[1], false)
+		}
+
 		saveTaskList(tasks)
 	case *titleFlag:
 		doSetTitle(tasks, *taskText)
