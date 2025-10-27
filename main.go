@@ -75,7 +75,7 @@ var summaryFlag = kingpin.Flag("summary", "Summarise tasks to one line.").Short(
 var orderFlag = kingpin.Flag("order", "Specify display order of tasks ([-]index,created,completed,text,priority,duration,done)").Default("priority").Enum(orderEnum...)
 
 // Add estimate flag
-var estimateFlag = kingpin.Flag("estimate", "Estimate for the task (e.g., 2h, 1d, 2w, 1m, 1y)").String()
+var estimateFlag = kingpin.Flag("estimate", "Estimate for the task (e.g., 10m, 2h, 1d, 2w, 1M, 1y)").String()
 
 // Task text.
 var taskText = kingpin.Arg("arg", "Task text or index.").Strings()
